@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIH Problem Statement Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Custom scrollbar for chat */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background-color: #e2e8f0;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #94a3b8;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #64748b;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+        <!-- Main Content Container -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-6xl mb-8 border border-gray-200">
+            <header class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">SIH Problem Statement Explorer</h1>
+                <p class="text-gray-500 text-sm md:text-base">Search, explore, and learn about the Smart India Hackathon
+                    problem statements.</p>
+            </header>
+
+            <!-- Search and Results Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Search and All Problems -->
+                <div class="bg-gray-100 p-6 rounded-xl border border-gray-200 shadow-inner">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">Find a Problem Statement</h2>
+                    <div class="relative mb-6">
+                        <input type="text" id="searchInput" placeholder="Enter SIH PS Code (e.g., SIH25051)"
+                            class="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-gray-700 shadow-sm"
+                            oninput="searchProblem()">
+                        <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+
+                    <!-- Search Result Display -->
+                    <div id="searchResult"
+                        class="bg-white p-4 rounded-xl border border-gray-200 shadow-md transition-all duration-300 transform scale-0 opacity-0 mb-6">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">Problem Details</h3>
+                        <div class="text-sm space-y-2" id="resultContent">
+                            <p class="text-gray-500">Search for a problem statement code to see its details here.</p>
+                        </div>
+                    </div>
+
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">All Problem Statements</h2>
+                    <div id="problemList"
+                        class="bg-white p-4 rounded-xl shadow-md border border-gray-200 h-[400px] overflow-y-auto custom-scrollbar">
+                        <!-- Problem statements will be rendered here by JS -->
+                    </div>
+                </div>
+
+                <!-- AI Chatbot Section -->
+                <div class="bg-gray-100 p-6 rounded-xl border border-gray-200 shadow-inner flex flex-col">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">AI Problem Assistant</h2>
+                    <div id="chatHistory"
+                        class="flex-grow bg-white p-4 rounded-xl border border-gray-200 shadow-md mb-4 overflow-y-auto custom-scrollbar h-[550px]">
+                        <div class="flex items-center justify-center h-full text-gray-500 text-center">
+                            Ask me anything about these problem statements!
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="text" id="chatInput" placeholder="Ask a question..."
+                            class="flex-grow pl-4 pr-12 py-2 rounded-xl bg-white border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-gray-700 shadow-sm">
+                        <button id="sendChatBtn"
+                            class="ml-2 bg-blue-500 text-white p-2 rounded-xl shadow-md hover:bg-blue-600 transition-colors duration-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables from Canvas
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId;
+
+        // Initialize Firebase
+        if (firebaseConfig) {
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            // Set up authentication listener
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    console.log("User authenticated:", userId);
+                    // Adhere to the `onSnapshot` rule
+                    onSnapshot(doc(db, `/artifacts/${appId}/users/${userId}/dummy_collection/dummy_doc`), (docSnapshot) => {
+                        console.log("Dummy listener triggered for user:", userId);
+                    }, (error) => {
+                        console.error("Dummy listener error:", error);
+                    });
+                } else {
+                    // Sign in with the provided token or anonymously
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Firebase auth error:", error);
+                    }
+                }
+            });
+
+        } else {
+            console.error("Firebase config is missing. The app will run without database and auth features.");
+        }
+
+    </script>
+
+    <script>
+        const problems = [
+            {
+                "id": 1,
+                "ministry": "Ministry of Development of North Eastern Region",
+                "title": "Smart Community Health Monitoring and Tele-Wellbeing System for Water-Borne Diseases in Rural Northwest India",
+                "type": "Software",
+                "code": "SIH25001",
+                "submitterCount": 0,
+                "category": "Travel & Tourism"
+            },
+            {
+                "id": 2,
+                "ministry": "Ministry of Development of North Eastern Region",
+                "title": "Smart Travel Safety Monitoring & Incident Response System using AI, Geo-fencing, and Blockchain-based Digital ID",
+                "type": "Software",
+                "code": "SIH25002",
+                "submitterCount": 0,
+                "category": "Travel & Tourism"
+            },
+            {
+                "id": 3,
+                "ministry": "Ministry of Development of North Eastern Region",
+                "title": "Low-cost smart transportation solution for daily commuters on remote farms to nearest motorable roads in NER Region",
+                "type": "Software",
+                "code": "SIH25003",
+                "submitterCount": 0,
+                "category": "Transportation & Logistics"
+            },
+            {
+                "id": 4,
+                "ministry": "Ministry of Fisheries, Animal Husbandry & Dairying",
+                "title": "Image-based breed recognition for cattle and buffaloes of India",
+                "type": "Software",
+                "code": "SIH25004",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 5,
+                "ministry": "Ministry of Fisheries, Animal Husbandry & Dairying",
+                "title": "Image-based breed recognition for cattle and buffaloes of India",
+                "type": "Software",
+                "code": "SIH25005",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 6,
+                "ministry": "Ministry of Fisheries, Animal Husbandry & Dairying",
+                "title": "Development of a Digital Farm Management Portal for Monitoring Biosecurity measures in Pig and Poultry Farms",
+                "type": "Software",
+                "code": "SIH25006",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 7,
+                "ministry": "Ministry of Fisheries, Animal Husbandry & Dairying",
+                "title": "Development of a Digital Farm Management Portal for Implementing Maximum Residue Limits (MRL) and Antimicrobial Usage (AMU) in Livestock",
+                "type": "Software",
+                "code": "SIH25007",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 8,
+                "ministry": "Government of Punjab",
+                "title": "Disaster Preparedness and Response Education System for Schools and Colleges",
+                "type": "Software",
+                "code": "SIH25008",
+                "submitterCount": 0,
+                "category": "Disaster Management"
+            },
+            {
+                "id": 9,
+                "ministry": "Government of Punjab",
+                "title": "Gamified Environment Education Platform for Schools and Colleges",
+                "type": "Software",
+                "code": "SIH25009",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 10,
+                "ministry": "Government of Punjab",
+                "title": "Smart Crop Advisory System for Small and Marginal Farmers",
+                "type": "Software",
+                "code": "SIH25010",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 11,
+                "ministry": "Government of Punjab",
+                "title": "Smart Curriculum Activity & Attendance App",
+                "type": "Software",
+                "code": "SIH25011",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 12,
+                "ministry": "Government of Punjab",
+                "title": "Automated Attendance System for Rural Schools",
+                "type": "Software",
+                "code": "SIH25012",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 13,
+                "ministry": "Government of Punjab",
+                "title": "Real Time Public Transport Tracking for Small Cities",
+                "type": "Software",
+                "code": "SIH25013",
+                "submitterCount": 0,
+                "category": "Transportation & Logistics"
+            },
+            {
+                "id": 14,
+                "ministry": "Government of Punjab",
+                "title": "Waste Segregation Monitoring System for Urban Local Bodies",
+                "type": "Hardware",
+                "code": "SIH25014",
+                "submitterCount": 0,
+                "category": "Clean & Green Technology"
+            },
+            {
+                "id": 15,
+                "ministry": "Government of Punjab",
+                "title": "Intelligent Pesticide Spraying System Determined by the Infection Level of a Plant",
+                "type": "Software",
+                "code": "SIH25015",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 16,
+                "ministry": "Government of Punjab",
+                "title": "Automated Student Attendance Monitoring and Analytics System in Colleges",
+                "type": "Software",
+                "code": "SIH25016",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 17,
+                "ministry": "Government of Punjab",
+                "title": "Digital Platform for Centralized Alumni Data Management and Engagement",
+                "type": "Software",
+                "code": "SIH25017",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 18,
+                "ministry": "Government of Punjab",
+                "title": "Telemedicine Access for Rural Healthcare in Nabha",
+                "type": "Software",
+                "code": "SIH25018",
+                "submitterCount": 0,
+                "category": "MedTech / BioTech / HealthTech"
+            },
+            {
+                "id": 19,
+                "ministry": "Government of Punjab",
+                "title": "Digital Learning Platform for Rural School Students in Nabha",
+                "type": "Software",
+                "code": "SIH25019",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 20,
+                "ministry": "Ministry of Railways",
+                "title": "Development of Indigenous Contactless Integrated Track Monitoring Systems (TMS) for Track Recording on Indian Railways",
+                "type": "Software",
+                "code": "SIH25020",
+                "submitterCount": 0,
+                "category": "Smart Automation"
+            },
+            {
+                "id": 21,
+                "ministry": "Ministry of Railways",
+                "title": "AI based development of Laser based QR Code Tracking on basic fittings on Indian Railways",
+                "type": "Hardware",
+                "code": "SIH25021",
+                "submitterCount": 0,
+                "category": "Transportation & Logistics"
+            },
+            {
+                "id": 22,
+                "ministry": "Ministry of Railways",
+                "title": "Maximizing Section Throughput Using AI-Powered Precise Train Traffic Control",
+                "type": "Software",
+                "code": "SIH25022",
+                "submitterCount": 0,
+                "category": "Transportation & Logistics"
+            },
+            {
+                "id": 23,
+                "ministry": "Ministry of Ayush",
+                "title": "AyurClinic Consultation Patient Management and Therapy Scheduling Software",
+                "type": "Software",
+                "code": "SIH25023",
+                "submitterCount": 0,
+                "category": "MedTech / BioTech / HealthTech"
+            },
+            {
+                "id": 24,
+                "ministry": "Ministry of Ayush",
+                "title": "Comprehensive Cloud-Based Practice Management & Nidan Analysis Software for Ayurvedic Doctors, Tailored for Ayurveda-Focused Diet Plans",
+                "type": "Software",
+                "code": "SIH25024",
+                "submitterCount": 0,
+                "category": "MedTech / BioTech / HealthTech"
+            },
+            {
+                "id": 25,
+                "ministry": "Ministry of Ayush",
+                "title": "F.Jangra for Designs Identification",
+                "type": "Software",
+                "code": "SIH25025",
+                "submitterCount": 0,
+                "category": "MedTech / BioTech / HealthTech"
+            },
+            {
+                "id": 26,
+                "ministry": "Ministry of Ayush",
+                "title": "Developing API tool to integrate NAMASTE and other international classification of diseases (ICD-11) via the Traditional Medicine Module 2 (TM2) into eSushruta",
+                "type": "Software",
+                "code": "SIH25026",
+                "submitterCount": 0,
+                "category": "MedTech / BioTech / HealthTech"
+            },
+            {
+                "id": 27,
+                "ministry": "Ministry of Ayush",
+                "title": "Develop a blockchain-based system for botanical traceability of Ayurvedic herbs, including geo-tagging from the point of collection (farmer/wild collectors)",
+                "type": "Software",
+                "code": "SIH25027",
+                "submitterCount": 0,
+                "category": "Blockchain & Cybersecurity"
+            },
+            {
+                "id": 28,
+                "ministry": "Government of Jharkhand",
+                "title": "Smart Classroom & Timetable Scheduler",
+                "type": "Software",
+                "code": "SIH25028",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 29,
+                "ministry": "Government of Jharkhand",
+                "title": "Authenticity Validator for Academia",
+                "type": "Software",
+                "code": "SIH25029",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 30,
+                "ministry": "Government of Jharkhand",
+                "title": "AI-Based Crop Recommendations for Farmers",
+                "type": "Software",
+                "code": "SIH25030",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 31,
+                "ministry": "Government of Jharkhand",
+                "title": "Crowdsourced Civic Issue Reporting and Resolution System",
+                "type": "Software",
+                "code": "SIH25031",
+                "submitterCount": 0,
+                "category": "Clean & Green Technology"
+            },
+            {
+                "id": 32,
+                "ministry": "Government of Jharkhand",
+                "title": "Development of a Smart Digital Platform to Promote Eco & Culture and Tourism in Jharkhand",
+                "type": "Software",
+                "code": "SIH25032",
+                "submitterCount": 0,
+                "category": "Travel & Tourism"
+            },
+            {
+                "id": 33,
+                "ministry": "Ministry of Corporate Affairs",
+                "title": "AI-Based Smart Automation Engine for PM Internship Scheme",
+                "type": "Software",
+                "code": "SIH25033",
+                "submitterCount": 0,
+                "category": "Smart Automation"
+            },
+            {
+                "id": 34,
+                "ministry": "Ministry of Corporate Affairs",
+                "title": "AI-Based Social Media Recommendation Engine for PM Internship Scheme",
+                "type": "Software",
+                "code": "SIH25034",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 35,
+                "ministry": "Ministry of Corporate Affairs",
+                "title": "Sentiment analysis of comments received through E-consultation module",
+                "type": "Software",
+                "code": "SIH25035",
+                "submitterCount": 0,
+                "category": "Miscellaneous"
+            },
+            {
+                "id": 36,
+                "ministry": "Ministry of Earth Sciences (MoES)",
+                "title": "Development of Sensor for Detection of Microplastics",
+                "type": "Software",
+                "code": "SIH25036",
+                "submitterCount": 0,
+                "category": "Miscellaneous"
+            },
+            {
+                "id": 37,
+                "ministry": "Ministry of Earth Sciences (MoES)",
+                "title": "Development of a low-cost camera-based automated beach sand grain size mapping system",
+                "type": "Hardware",
+                "code": "SIH25037",
+                "submitterCount": 0,
+                "category": "Miscellaneous"
+            },
+            {
+                "id": 38,
+                "ministry": "Ministry of Earth Sciences (MoES)",
+                "title": "Blockchain-Based Blue Carbon Registry and MRV System",
+                "type": "Software",
+                "code": "SIH25038",
+                "submitterCount": 0,
+                "category": "Clean & Green Technology"
+            },
+            {
+                "id": 39,
+                "ministry": "Ministry of Earth Sciences (MoES)",
+                "title": "Digital Platform for Crowdsourced Ocean Hazard Monitoring and Social Media Analytics",
+                "type": "Software",
+                "code": "SIH25039",
+                "submitterCount": 0,
+                "category": "Disaster Management"
+            },
+            {
+                "id": 40,
+                "ministry": "Ministry of Earth Sciences (MoES)",
+                "title": "FloatChat - AI-Powered Conversational Interface for A-ISED Ocean Data Discovery with Visualization",
+                "type": "Software",
+                "code": "SIH25040",
+                "submitterCount": 0,
+                "category": "Miscellaneous"
+            },
+            {
+                "id": 41,
+                "ministry": "Ministry of Earth Sciences (MoES)",
+                "title": "AI-Driven Unified Data Platform for Oceanographic, Fisheries, and Molecular Biodiversity Insights",
+                "type": "Software",
+                "code": "SIH25041",
+                "submitterCount": 0,
+                "category": "Renewable / Sustainable Energy"
+            },
+            {
+                "id": 42,
+                "ministry": "Ministry of Earth Sciences (MoES)",
+                "title": "Intelligent Taxonomy and Assessing Biodiversity from DNA-Diseases",
+                "type": "Software",
+                "code": "SIH25042",
+                "submitterCount": 0,
+                "category": "Miscellaneous"
+            },
+            {
+                "id": 43,
+                "ministry": "Ministry of Earth Sciences (MoES)",
+                "title": "Embedded Intelligent Microscopy System for Identification and Counting of Macroscopic Marine Organisms",
+                "type": "Software",
+                "code": "SIH25043",
+                "submitterCount": 0,
+                "category": "Smart Automation"
+            },
+            {
+                "id": 44,
+                "ministry": "Government of Odisha",
+                "title": "AI-Based Agricultural Pest and Disease Identification System",
+                "type": "Software",
+                "code": "SIH25044",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 45,
+                "ministry": "Government of Odisha",
+                "title": "Blockchain-Based Supply Chain Transparency for Agricultural Produce",
+                "type": "Software",
+                "code": "SIH25045",
+                "submitterCount": 0,
+                "category": "Agriculture, FoodTech & Rural Development"
+            },
+            {
+                "id": 46,
+                "ministry": "Government of Odisha",
+                "title": "Smart Waste Segregation and Recycling System",
+                "type": "Hardware",
+                "code": "SIH25046",
+                "submitterCount": 0,
+                "category": "Clean & Green Technology"
+            },
+            {
+                "id": 47,
+                "ministry": "Government of Odisha",
+                "title": "Disaster Response Drone for Remote Areas",
+                "type": "Hardware",
+                "code": "SIH25047",
+                "submitterCount": 0,
+                "category": "Robotics and Drones"
+            },
+            {
+                "id": 48,
+                "ministry": "Government of Odisha",
+                "title": "Gamified Learning Platform for Rural Education",
+                "type": "Software",
+                "code": "SIH25048",
+                "submitterCount": 0,
+                "category": "Smart Education"
+            },
+            {
+                "id": 49,
+                "ministry": "Government of Odisha",
+                "title": "AI-Driven Public Health Chatbot for Disease Awareness",
+                "type": "Software",
+                "code": "SIH25049",
+                "submitterCount": 0,
+                "category": "MedTech / BioTech / HealthTech"
+            },
+            {
+                "id": 50,
+                "ministry": "Government of Odisha",
+                "title": "Smart Traffic Management System for Urban Congestion",
+                "type": "Software",
+                "code": "SIH25050",
+                "submitterCount": 0,
+                "category": "Transportation & Logistics"
+            },
+            { "id": 51, "ministry": "Government of Odisha", "title": "Renewable Energy Monitoring System for Microgrids", "type": "Hardware", "code": "SIH25051", "submitterCount": 0, "category": "Renewable / Sustainable Energy" },
+            { "id": 52, "ministry": "Government of Odisha", "title": "AR-Based Cultural Heritage Preservation Platform", "type": "Software", "code": "SIH25052", "submitterCount": 0, "category": "Heritage & Culture" },
+            { "id": 53, "ministry": "Ministry of Consumer Affairs, Food & Public Distribution (MoCA,F&PD)", "title": "Improved Onion storage technology for enhancing shelf life of onions", "type": "Hardware", "code": "SIH25053", "submitterCount": 0, "category": "Agriculture, FoodTech & Rural Development" },
+            { "id": 54, "ministry": "Ministry of Consumer Affairs, Food & Public Distribution (MoCA,F&PD)", "title": "Automated High-Current Short-Circuit Test System for MCB to comply with IEC 60898-1:2015", "type": "Hardware", "code": "SIH25054", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 55, "ministry": "Ministry of Consumer Affairs, Food & Public Distribution (MoCA,F&PD)", "title": "Automated Specimen Preparation System for testing of Cable samples as per IS 10810 and IS 7098.", "type": "Hardware", "code": "SIH25055", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 56, "ministry": "Ministry of Consumer Affairs, Food & Public Distribution (MoCA,F&PD)", "title": "To explore new/altermative assaying methods to the fire assay method for testing of gold jewellery and artefacts through non-destructive testing", "type": "Hardware", "code": "SIH25056", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 57, "ministry": "Ministry of Consumer Affairs, Food & Public Distribution (MoCA,F&PD)", "title": "Automated Compliance Checker for Legal Metrology Declarations on E-Commerce Platforms", "type": "Hardware", "code": "SIH25057", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 58, "ministry": "Ministry of Consumer Affairs, Food & Public Distribution (MoCA,F&PD)", "title": "Detection and Prevention of Tampering in Weighing and Measuring instruments", "type": "Hardware", "code": "SIH25058", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 59, "ministry": "Ministry of Social Justice & Empowerment (MoSJE)", "title": "Enhancing Student Awareness on difference between Aadhaar linked and Direct Beneficiary Transfer(DBT) enabled Aadhaar seeded bank account.", "type": "Software", "code": "SIH25059", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 60, "ministry": "Ministry of Social Justice & Empowerment (MoSJE)", "title": "Real life solutions for Waste Management.", "type": "Software", "code": "SIH25060", "submitterCount": 0, "category": "Clean & Green Technology" },
+            { "id": 61, "ministry": "Government of Sikkim", "title": "Digitize and Showcase Monasteries of Sikkim for Tourism and Cultural Preservation", "type": "Software", "code": "SIH25061", "submitterCount": 0, "category": "Travel & Tourism" },
+            { "id": 62, "ministry": "Government of Sikkim", "title": "Implementation of Smart Agriculture for Efficient Cultivation in Hilly Regions", "type": "Hardware", "code": "SIH25062", "submitterCount": 0, "category": "Agriculture, FoodTech & Rural Development" },
+            { "id": 63, "ministry": "Government of Kerala", "title": "Developing a cost effective solution for detecting the breakage of Low Voltage AC Distribution Over Head conductors", "type": "Hardware", "code": "SIH25063", "submitterCount": 0, "category": "Disaster Management" },
+            { "id": 64, "ministry": "Government of Kerala", "title": "Improving the Renewable Energy hosting capacity in Distribution Feeders improving the Power quality of Distribution network during high RE injection", "type": "Hardware", "code": "SIH25064", "submitterCount": 0, "category": "Renewable / Sustainable Energy" },
+            { "id": 65, "ministry": "Ministry of Jal Shakti", "title": "Designing and development of an application for on spot assessment of Roof Top Rain water harvesting and artificial recharge potential and size of the RTRWH and AR.", "type": "Software", "code": "SIH25065", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 66, "ministry": "Ministry of Jal Shakti", "title": "Development of an Al-driven ChatBOT for INGRES as a virtuall assistant", "type": "Software", "code": "SIH25066", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 67, "ministry": "Ministry of Jal Shakti", "title": "Proposal for Design and development of application or Heavy Metal Pollution indices", "type": "Software", "code": "SIH25067", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 68, "ministry": "Ministry of Jal Shakti", "title": "Real time Groundwater resource evaluation using DWLR data", "type": "Software", "code": "SIH25068", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 69, "ministry": "Ministry of Mines", "title": "Al-Driven Life Cycle Assessment (LCA) Tool for Advancing Circulanty and Sustainability in Metallurgy and Mining", "type": "Software", "code": "SIH25069", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 70, "ministry": "Ministry of Mines", "title": "Secure Data Wiping for Trustworthy IT Asset Recycling", "type": "Software", "code": "SIH25070", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 71, "ministry": "Ministry of Mines", "title": "Al-Based Rockfall Prediction and Alert System for Open-Pit Mines", "type": "Software", "code": "SIH25071", "submitterCount": 0, "category": "Disaster Management" },
+            { "id": 72, "ministry": "Ministry of Mines", "title": "Design and Implementation of Solar-Powered Dewatering in Mining Operations.", "type": "Hardware", "code": "SIH25072", "submitterCount": 0, "category": "Renewable / Sustainable Energy" },
+            { "id": 73, "ministry": "Ministry of Youth Affairs and Sports", "title": "Al-Powered Mobile Platform for Democratizing Sports Talent Assessment", "type": "Software", "code": "SIH25073", "submitterCount": 0, "category": "Fitness & Sports" },
+            { "id": 74, "ministry": "Government of Kerala", "title": "AI-Powered Personal Farming Assistant for Kerala Farmers", "type": "Software", "code": "SIH25074", "submitterCount": 0, "category": "Agriculture, FoodTech & Rural Development" },
+            { "id": 75, "ministry": "Government of Kerala", "title": "Gamified Platform to Promote Sustainable Farming Practices", "type": "Software", "code": "SIH25075", "submitterCount": 0, "category": "Agriculture, FoodTech & Rural Development" },
+            { "id": 76, "ministry": "Government of Kerala", "title": "AI-Based Farmer Query Support and Advisory System", "type": "Software", "code": "SIH25076", "submitterCount": 0, "category": "Agriculture, FoodTech & Rural Development" },
+            { "id": 77, "ministry": "Government of Kerala", "title": "A hardware that can detect and prevent unauthorized use of electric fences", "type": "Hardware", "code": "SIH25077", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 78, "ministry": "Government of Kerala", "title": "Software other than a circuit breaker that can be used to detect and turn off LT lines when the line breaks", "type": "Software", "code": "SIH25079", "submitterCount": 0, "category": "Disaster Management" },
+            { "id": 79, "ministry": "Government of Kerala", "title": "Document Overload at Kochi Metro Rail Limited (KMRL)-An automated solution", "type": "Software", "code": "SIH25080", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 80, "ministry": "Government of Kerala", "title": "AI-Driven Train Induction Planning & Scheduling for Kochi Metro Rail Limited (KMRL)", "type": "Software", "code": "SIH25081", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 81, "ministry": "Government of Kerala", "title": "Development of a travel related software app that can be installed on mobile phones that could capture trip related information", "type": "Software", "code": "SIH25082", "submitterCount": 0, "category": "Travel & Tourism" },
+            { "id": 82, "ministry": "Government of Kerala", "title": "Digital Health Record Management System for migrant workers in Kerala aligned with sustainable development goals.", "type": "Software", "code": "SIH25083", "submitterCount": 0, "category": "MedTech / BioTech / HealthTech" },
+            { "id": 83, "ministry": "Government of Kerala", "title": "Earthquake stabilised dialysis system for patient safety during seismic events.", "type": "Hardware", "code": "SIH25084", "submitterCount": 0, "category": "Disaster Management" },
+            { "id": 84, "ministry": "Government of Kerala", "title": "Solution for NON-REVENUE LOSS IN WATER SUPPLY Solution to improve AWARENESS IN WATER CONSERVATION TREATMENT OF WASTE WATER AND REUSE FOR DOMESTIC PURPOSES", "type": "Hardware", "code": "SIH25085", "submitterCount": 0, "category": "Miscellaneous" },
+            { "id": 85, "ministry": "Government of Kerala", "title": "GREY WATER MANAGEMENT AND REUSE WET LAND MANAGEMENT WATER CONSERVATION", "type": "Hardware", "code": "SIH25090", "submitterCount": 0, "category": "Clean & Green Technology" },
+            { "id": 86, "ministry": "Government of Jammu and Kashmir", "title": "AI-Based Timetable Generation System aligned with NEP 2020 for Multidisciplinary Education Structures", "type": "Software", "code": "SIH25091", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 87, "ministry": "Government of Jammu and Kashmir", "title": "Development of a Digital Mental Health and Psychological Support System for Students in Higher Education", "type": "Software", "code": "SIH25092", "submitterCount": 0, "category": "MedTech / BioTech / HealthTech" },
+            { "id": 88, "ministry": "Government of Jammu and Kashmir", "title": "Centralised Digital Platform for Comprehensive student activity record in HEIs", "type": "Software", "code": "SIH25093", "submitterCount": 0, "category": "Smart Education" },
+            { "id": 89, "ministry": "Government of Jammu and Kashmir", "title": "One-Stop Personalized Career & Education Advisor", "type": "Software", "code": "SIH25094", "submitterCount": 0, "category": "Smart Education" },
+            { "id": 90, "ministry": "Autodesk", "title": "Research and redesign a sport equipment commonly found in sport industry and utilize Fusion software to reimagine its design. Students can use Fusion Features such as Generative Design, Topology Optimization, Additive Build etc. The redesigned component should showcase innovation, enhanced functionality, and improved efficiency, all while being optimized for 3D printing.", "type": "Hardware", "code": "SIH25095", "submitterCount": 0, "category": "Smart Education" },
+            { "id": 91, "ministry": "Autodesk", "title": "• Students are supposed to use Fusion software to generate NC code with machine details & tool library for any industrial component. • Students should possess technical skills in areas such as CAD/CAM software, G-code programming, toolpath optimization, and machining fundamentals. Additionally, their project ideas should demonstrate a viable solution to a real-world problem, ensuring feasibility and practicality in implementation.", "type": "Hardware", "code": "SIH25096", "submitterCount": 0, "category": "Smart Education" },
+            { "id": 92, "ministry": "Autodesk", "title": "Research and develop a design on autonomous small precision focused machine for planting crops or weeding.", "type": "Software", "code": "SIH25097", "submitterCount": 0, "category": "Smart Education" },
+            { "id": 93, "ministry": "Autodesk", "title": "Students are tasked with designing a 4-story commercial office building using Revit Architecture and Revit Structure , ensuring effective integration between architectural and structural models in a BIM environment.(The size of the plot can be assumed by the students, all the dimensions wherever necessary can be assumed by students in mm units.)", "type": "Software", "code": "SIH25098", "submitterCount": 0, "category": "Smart Education" },
+            { "id": 94, "ministry": "MathWorks India Pvt. Ltd.", "title": "AI-powered monitoring of crop health, soil condition, and pest risks using multispectral/hyperspectral imaging and sensor data.", "type": "Software", "code": "SIH25099", "submitterCount": 0, "category": "Agriculture, FoodTech & Rural Development" },
+            { "id": 95, "ministry": "MathWorks India Pvt. Ltd.", "title": "Accelerating High-Fidelity Road Network Modeling for Indian Traffic Simulations.", "type": "Software", "code": "SIH25100", "submitterCount": 0, "category": "Transportation & Logistics" },
+            { "id": 96, "ministry": "Government of Rajasthan", "title": "Remote classroom for rural colleges", "type": "Software", "code": "SIH25101", "submitterCount": 0, "category": "Smart Education" },
+            { "id": 97, "ministry": "Government of Rajasthan", "title": "AI-based drop-out prediction and counseling system", "type": "Software", "code": "SIH25102", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 98, "ministry": "Government of Rajasthan", "title": "ERP-based Integrated Student Management system", "type": "Software", "code": "SIH25103", "submitterCount": 0, "category": "Smart Automation" },
+            { "id": 99, "ministry": "Government of Rajasthan", "title": "Language Agnostic Chatbot", "type": "Software", "code": "SIH25104", "submitterCount": 0, "category": "Smart Education" },
+            { "id": 100, "ministry": "AICTE", "title": "Develop computer programs (in any language, preferably Python) to identify the design principles behind the Kolam designs and recreate the kolams.", "type": "Software", "code": "SIH12507", "submitterCount": 0, "category": "Heritage & Culture" },
+            { "id": 101, "ministry": "Ministry of Tribal Affairs(MoTA)", "title": "Development of AI-powered FRA Atlas and WebGIS-based Decision Support System (DSS) for Integrated Monitoring of Forest Rights Act (FRA) Implementation. (States to be concentrated: Madhya Pradesh, Tripura , Odisha, Telangana)", "type": "Software", "code": "SIH12508", "submitterCount": 0, "category": "Miscellaneous" }
+        ];
+
+        // Function to display all problems on load
+        function displayAllProblems() {
+            const problemList = document.getElementById('problemList');
+            problemList.innerHTML = '';
+            if (problems.length > 0) {
+                problems.forEach(p => {
+                    const problemDiv = document.createElement('div');
+                    problemDiv.className = 'p-4 border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg';
+                    problemDiv.innerHTML = `
+                        <p class="font-semibold text-blue-600">${p.code}</p>
+                        <p class="text-sm text-gray-700">${p.title}</p>
+                        <span class="text-xs text-gray-400 font-medium">${p.category}</span>
+                    `;
+                    problemDiv.onclick = () => showProblemDetails(p.code);
+                    problemList.appendChild(problemDiv);
+                });
+            } else {
+                problemList.innerHTML = `<p class="text-gray-500">No problem statements available to display.</p>`;
+            }
+        }
+
+        // Function to show details of a single problem
+        function showProblemDetails(code) {
+            const problem = problems.find(p => p.code && p.code.toLowerCase() === code.toLowerCase());
+            const resultDiv = document.getElementById('searchResult');
+            const resultContent = document.getElementById('resultContent');
+
+            if (problem) {
+                resultContent.innerHTML = `
+                    <p class="text-gray-900 font-bold mb-2">${problem.title}</p>
+                    <p><span class="font-semibold">Ministry:</span> ${problem.ministry}</p>
+                    <p><span class="font-semibold">Type:</span> ${problem.type}</p>
+                    <p><span class="font-semibold">Category:</span> ${problem.category}</p>
+                `;
+                resultDiv.classList.remove('scale-0', 'opacity-0');
+                resultDiv.classList.add('scale-100', 'opacity-100');
+            } else {
+                resultContent.innerHTML = `<p class="text-red-500 font-semibold">Problem statement with code '${code}' not found.</p>`;
+                resultDiv.classList.remove('scale-0', 'opacity-0');
+                resultDiv.classList.add('scale-100', 'opacity-100');
+            }
+        }
+
+        // Search handler
+        function searchProblem() {
+            const input = document.getElementById('searchInput').value;
+            if (input.trim() !== '') {
+                showProblemDetails(input.trim());
+            } else {
+                // Clear the search result display
+                const resultDiv = document.getElementById('searchResult');
+                resultDiv.classList.remove('scale-100', 'opacity-100');
+                resultDiv.classList.add('scale-0', 'opacity-0');
+            }
+        }
+
+        // AI Chatbot Functionality
+        const chatHistory = document.getElementById('chatHistory');
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
+
+        // Function to add a message to the chat history
+        function addMessage(sender, text, isError = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `p-3 rounded-lg max-w-[85%] mb-4 ${sender === 'user' ? 'bg-blue-500 text-white self-end ml-auto' : 'bg-gray-200 text-gray-800 self-start mr-auto'} ${isError ? 'bg-red-500 text-white' : ''}`;
+            messageDiv.textContent = text;
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // Function to call the Gemini API
+        async function getGeminiResponse(userQuery) {
+            sendChatBtn.disabled = true;
+            addMessage('user', userQuery);
+            chatInput.value = '';
+
+            const loadingMessage = document.createElement('div');
+            loadingMessage.id = 'loadingMessage';
+            loadingMessage.className = 'p-3 rounded-lg bg-gray-200 text-gray-500 max-w-[85%] self-start mr-auto animate-pulse';
+            loadingMessage.textContent = 'Thinking...';
+            chatHistory.appendChild(loadingMessage);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            const systemPrompt = "You are a helpful assistant for the Smart India Hackathon. Your knowledge is based on the provided problem statements. Answer questions concisely and professionally, referencing the problem statement code when possible.";
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+            const apiKey = "AIzaSyAjJwmqiTGRLbNB79vnloSPJZ1KwJVc8jo"; // Replace with your actual API key
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            let response;
+            try {
+                response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const text = candidate.content.parts[0].text;
+                    addMessage('assistant', text);
+                } else {
+                    addMessage('assistant', "Sorry, I couldn't get a response. Please try again.", true);
+                    console.error("Unexpected API response structure:", result);
+                }
+
+            } catch (error) {
+                console.error("Error fetching from Gemini API:", error);
+                addMessage('assistant', "An error occurred. Please check your network connection.", true);
+            } finally {
+                sendChatBtn.disabled = false;
+                const loadingMsg = document.getElementById('loadingMessage');
+                if (loadingMsg) {
+                    loadingMsg.remove();
+                }
+            }
+        }
+
+        sendChatBtn.addEventListener('click', () => {
+            const query = chatInput.value.trim();
+            if (query) {
+                getGeminiResponse(query);
+            }
+        });
+
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                sendChatBtn.click();
+            }
+        });
+
+        // Initialize the app on window load
+        window.onload = () => {
+            displayAllProblems();
+        };
+
+    </script>
+</body>
+
+</html>
